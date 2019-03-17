@@ -21,28 +21,28 @@ def form_data_set(df: pd.DataFrame):
 
 def save_states(tx, states: pd.DataFrame):
     for _, state in states.iterrows():
-        tx.run("MERGE (State {name: $name, abbr: $abbr})",
+        tx.run("MERGE (s:State {name: $name, abbr: $abbr})",
                name=state["LocationDesc"], abbr=state["LocationAbbr"])
 
 
 def save_tobacco(tx, tobaccos: pd.Series):
     for tobacco in tobaccos:
-        tx.run("MERGE (Tobacco {name: $name})", name=tobacco)
+        tx.run("MERGE (t:Tobacco {name: $name})", name=tobacco)
 
 
 def save_persons(tx, poll: pd.DataFrame, fake: Faker):
     amount = int(poll["Sample_Size"] / 50)
     for _ in range(amount):
-        name = fake.female_name() if poll["Gender"] == "female" else fake.male_name()
+        name = (fake.female_name() if poll["Gender"] == "female" else fake.male_name()) + " " + fake.surname()
         tx.run("""MATCH (s:State)
                   WHERE s.name = $state
                   CREATE (p:Person {name: $name, gender: $gender})
                   CREATE (p)-[:LIVES]->(s)""", state=poll["LocationDesc"], name=name, gender=poll["Gender"])
         if poll["Response"] != "Never":
             tx.run("""MATCH (p:Person), (t:Tobacco)
-                      WHERE p.name = $name AND t.name=$tobac
+                      WHERE p.name = $name AND t.name=$tobacco
                       CREATE (p)-[:SMOKED {status:$status}]->(t)""",
-                   tobac=poll["Tobacco"], name=name, status=poll["Response"])
+                   tobacco=poll["Tobacco"], name=name, status=poll["Response"])
 
 
 def main():
@@ -53,7 +53,7 @@ def main():
     raw_df = pd.read_csv("./data/tobacco.csv")
     df = form_data_set(raw_df)
 
-    tobaccos = df["TopicDesc"].unique()
+    tobaccos = df["Tobacco"].unique()
     states = df[["LocationDesc", "LocationAbbr"]].drop_duplicates()
 
     with db.session() as session:
@@ -61,7 +61,7 @@ def main():
         session.write_transaction(save_tobacco, tobaccos)
 
         for i, poll in df.iterrows():
-            print("Saved %d" % i)
+            print("Saved: %d" % i)
             session.write_transaction(save_persons, poll, fake)
 
 
