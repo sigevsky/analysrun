@@ -1,0 +1,11 @@
+version: '2.1'
+
+services:
+  neo4j:
+    image: neo4j
+    container_name: neo4j
+    volumes:
+      - ./neo4j/data:/data
+    ports:
+      - 7474:7474
+      - 7687:7687
