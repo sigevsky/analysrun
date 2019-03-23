@@ -2,10 +2,18 @@ from neo4j import GraphDatabase, basic_auth
 import pandas as pd
 from faker import Faker
 from name_provider import Provider
+import numpy as np
 
 db_location = "bolt://localhost:7687"
 username = "neo4j"
 password = "qwerty"
+
+age_stat = {
+    'Cigarette': [30, 5],
+    'Pipe': [55, 3],
+    'Cigar': [40, 3],
+    'Smokeless Tobacco': [22, 3]
+}
 
 
 def form_data_set(df: pd.DataFrame):
@@ -30,18 +38,25 @@ def save_tobacco(tx, tobaccos: pd.Series):
         tx.run("MERGE (t:Tobacco {name: $name})", name=tobacco)
 
 
+def rand_age(tobacco: str):
+    mean, dist = age_stat[tobacco]
+    res = np.random.normal(mean, dist)
+    return int(res) if 18 <= res <= 60 else rand_age(tobacco)
+
+
 def save_persons(tx, poll: pd.DataFrame, fake: Faker):
-    amount = int(poll["Sample_Size"] / 50)
+    amount = int(poll["Sample_Size"] * poll["Data_Value"] / 100. / 2.5)
     for _ in range(amount):
         name = (fake.female_name() if poll["Gender"] == "female" else fake.male_name()) + " " + fake.surname()
+        age = rand_age(poll["Tobacco"])
         tx.run("""MATCH (s:State)
                   WHERE s.name = $state
-                  CREATE (p:Person {name: $name, gender: $gender})
-                  CREATE (p)-[:LIVES]->(s)""", state=poll["LocationDesc"], name=name, gender=poll["Gender"])
+                  CREATE (p:Person {name: $name, gender: $gender, age: $age})
+                  CREATE (p)-[:LIVES]->(s)""", state=poll["LocationDesc"], name=name, gender=poll["Gender"], age=age)
         if poll["Response"] != "Never":
             tx.run("""MATCH (p:Person), (t:Tobacco)
                       WHERE p.name = $name AND t.name=$tobacco
-                      CREATE (p)-[:SMOKED {status:$status}]->(t)""",
+                      CREATE (p)-[:SMOKES {status:$status}]->(t)""",
                    tobacco=poll["Tobacco"], name=name, status=poll["Response"])
 
 
