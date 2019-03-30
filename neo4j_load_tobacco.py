@@ -60,7 +60,7 @@ def save_persons(tx, poll: pd.DataFrame, fake: Faker):
                    tobacco=poll["Tobacco"], name=name, status=poll["Response"])
 
 
-def main():
+def load_tobacco():
     fake = Faker()
     fake.add_provider(Provider)
     db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
@@ -80,4 +80,4 @@ def main():
             session.write_transaction(save_persons, poll, fake)
 
 
-main()
+load_tobacco()

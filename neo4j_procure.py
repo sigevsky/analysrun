@@ -10,7 +10,7 @@ password = "qwerty"
 
 query = """
         MATCH (p:Person)-[sm:SMOKES]->(t:Tobacco), (p)-[lv:LIVES]->(s:State)
-        RETURN p.gender as gender, p.age as age, t.name as tobacco
+        RETURN s.name as state_name, p.gender as gender, p.age as age, t.name as tobacco
         """
 
 
@@ -38,8 +38,8 @@ def main():
     with db.session() as session:
         df = session.read_transaction(get_dataset)
         df['tobacco'] = df['tobacco'].apply(is_tobacco_of('Smokeless Tobacco'))
-        df = categorize(df, ['gender', 'tobacco'])
-        X_data = df.filter(items=['gender', 'age'])
+        df = categorize(df, ['state_name', 'gender'])
+        X_data = df.filter(items=['state_name', 'gender', 'age'])
         y_data = df["tobacco"]
 
         X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.10, random_state=42)
