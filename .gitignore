@@ -2,4 +2,6 @@
 /venv
 /idea
 /vscode
+/models
+/.*
 /__pycache__
