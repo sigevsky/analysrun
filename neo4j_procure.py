@@ -1,6 +1,6 @@
 from neo4j import GraphDatabase, basic_auth
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import train_test_split
 import pickle as pcl
@@ -28,11 +28,15 @@ def is_tobacco_of(tobacco: str):
     return go
 
 
-def predict(model: LogisticRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
+def predict_logistic(model: LogisticRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
     return model.predict(np.column_stack((encoder.transform(df.filter(items=['state_name', 'gender'])), df['age'].values)))
 
 
-def main():
+def predict_linear(model: LinearRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
+    return model.predict(encoder.transform(df.filter(items=['state_name', 'gender', 'tobacco'])))
+
+
+def logistic():
     db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
     feature_encoder = OrdinalEncoder()
 
@@ -53,4 +57,29 @@ def main():
         res = len(y_pred[y_pred == y_test]) / len(y_pred)
         print(f"Accuracy: {res}")
 
-main()
+
+
+
+def linear():
+    db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
+    feature_encoder = OrdinalEncoder()
+    linear_model = LinearRegression()
+
+    with db.session() as session:
+        df = session.read_transaction(get_dataset)
+        y_data = df['age'].values
+        X_data = feature_encoder.fit_transform(df.filter(items=['state_name', 'gender', 'tobacco']))
+
+        X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.10, random_state=42)
+
+        linear_model.fit(X_train, y_train)
+        serz = pcl.dumps(linear_model)
+        with open('./models/linear_model', 'wb') as out:
+            print("Serializing model to the file.. ")
+            out.write(serz)
+
+        y_pred = linear_model.predict(X_test)
+        res = {f'Accuracy for {i} years': len(y_pred[np.abs(y_pred - y_test) < i]) / len(y_pred) for i in range(1, 10, 2)}
+        print(res)
+
+linear()
