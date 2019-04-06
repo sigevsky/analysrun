@@ -3,6 +3,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import train_test_split
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 import pickle as pcl
 import numpy as np
 
@@ -28,14 +30,6 @@ def is_tobacco_of(tobacco: str):
     return go
 
 
-def predict_logistic(model: LogisticRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return model.predict(np.column_stack((encoder.transform(df.filter(items=['state_name', 'gender'])), df['age'].values)))
-
-
-def predict_linear(model: LinearRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return model.predict(encoder.transform(df.filter(items=['state_name', 'gender', 'tobacco'])))
-
-
 def logistic():
     db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
     feature_encoder = OrdinalEncoder()
@@ -48,7 +42,7 @@ def logistic():
         X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.10, random_state=42)
         logistic_model = LogisticRegression(solver='lbfgs')
         logistic_model.fit(X_train, y_train)
-        serz = pcl.dumps(logistic_model)
+        serz = pcl.dumps(("Logistic", logistic_model, feature_encoder))
         with open('./models/logistic_model', 'wb') as out:
             print("Serializing model to the file.. ")
             out.write(serz)
@@ -56,8 +50,6 @@ def logistic():
         y_pred = logistic_model.predict(X_test)
         res = len(y_pred[y_pred == y_test]) / len(y_pred)
         print(f"Accuracy: {res}")
-
-
 
 
 def linear():
@@ -73,7 +65,7 @@ def linear():
         X_train, X_test, y_train, y_test = train_test_split(X_data, y_data, test_size=0.10, random_state=42)
 
         linear_model.fit(X_train, y_train)
-        serz = pcl.dumps(linear_model)
+        serz = pcl.dumps(("Linear", linear_model, feature_encoder))
         with open('./models/linear_model', 'wb') as out:
             print("Serializing model to the file.. ")
             out.write(serz)
@@ -82,4 +74,25 @@ def linear():
         res = {f'Accuracy for {i} years': len(y_pred[np.abs(y_pred - y_test) < i]) / len(y_pred) for i in range(1, 10, 2)}
         print(res)
 
-linear()
+
+def multilinear():
+    db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
+    fe = OrdinalEncoder()
+    multilinear_model = MultiOutputRegressor(estimator=GradientBoostingRegressor(random_state=42))
+
+    with db.session() as session:
+        df = session.read_transaction(get_dataset)
+        Y_data = np.column_stack((df['age'].values, fe.fit_transform(df[['gender']])))
+        X_data = fe.fit_transform(df[['state_name', 'tobacco']])
+
+        X_train, X_test, Y_train, Y_test = train_test_split(X_data, Y_data, test_size=0.10, random_state=42)
+
+        multilinear_model.fit(X_train, Y_train)
+        serz = pcl.dumps(("MultiLinear", multilinear_model, fe))
+        with open('./models/multilinear_model', 'wb') as out:
+            print("Serializing model to the file.. ")
+            out.write(serz)
+
+
+multilinear()
+
