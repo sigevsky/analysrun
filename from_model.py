@@ -7,15 +7,21 @@ import numpy as np
 
 
 def predict_logistic(model: LogisticRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return model.predict(np.column_stack((encoder.transform(df[['state_name', 'gender']]), df['age'].values)))
+    return pd.DataFrame(columns=["does person smoke specified tobacco"],
+                        data=model.predict(np.column_stack((encoder.transform(df[['state_name', 'gender']]), df['age'].values))))
 
 
 def predict_linear(model: LinearRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return model.predict(encoder.transform(df[['state_name', 'gender', 'tobacco']]))
+    res = model.predict(encoder.transform(df[['state_name', 'gender', 'tobacco']]))
+    return pd.DataFrame(columns=["age"],
+                        data=res.round())
 
 
 def predict_multilinear(model: MultiOutputRegressor, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return model.predict(encoder.transform(df[['state_name', 'tobacco']]))
+    res = model.predict(encoder.transform(df[['state_name', 'tobacco']])).round()
+    df = pd.DataFrame(columns=["age", "gender"], data=res)
+    df["gender"] = df["gender"].apply(lambda a: "Male" if a == 1. else "Female")
+    return df
 
 
 predictors = {
