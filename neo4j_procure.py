@@ -5,6 +5,7 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.multioutput import MultiOutputRegressor
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.tree import DecisionTreeClassifier
 import pickle as pcl
 import numpy as np
 
@@ -94,5 +95,27 @@ def multilinear():
             out.write(serz)
 
 
-multilinear()
+def decision_tree():
+    db = GraphDatabase.driver(db_location, auth=basic_auth(username, password))
+    fe_y = OrdinalEncoder()
+    fe_x = OrdinalEncoder()
+    dt_model = DecisionTreeClassifier()
+
+    with db.session() as session:
+        df = session.read_transaction(get_dataset)
+        cat_columns = ['state_name', 'gender']
+        df[cat_columns] = fe_y.fit_transform(df[cat_columns])
+        Y_data = fe_y.fit_transform(df['tobacco'].values.reshape(-1, 1))
+        X_data = np.column_stack((fe_x.fit_transform(df[cat_columns]), df['age'].values))
+
+        X_train, X_test, Y_train, Y_test = train_test_split(X_data, Y_data, test_size=0.10, random_state=42)
+
+        dt_model.fit(X_train, Y_train)
+        serz = pcl.dumps(("DecisionTree", dt_model, (fe_x, fe_y)))
+        with open('./models/decision_tree_model', 'wb') as out:
+            print("Serializing model to the file.. ")
+            out.write(serz)
+
+
+decision_tree()
 
