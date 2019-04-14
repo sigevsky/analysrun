@@ -8,8 +8,12 @@ import numpy as np
 
 
 def predict_logistic(model: LogisticRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
-    return pd.DataFrame(columns=["does person smoke specified tobacco"],
-                        data=model.predict(np.column_stack((encoder.transform(df[['state_name', 'gender']]), df['age'].values))))
+    raw = np.column_stack((encoder.transform(df[['state_name', 'gender']]), df['age'].values))
+    prob = model.predict_proba(raw)
+    answ = list(map(lambda e: "Y" if e == 1.0 else "N", model.predict(raw)))
+    res = np.column_stack((prob, answ))
+    return pd.DataFrame(columns=["N probability", "Y probability", "Y/N"],
+                        data=res)
 
 
 def predict_linear(model: LinearRegression, encoder: OrdinalEncoder, df: pd.DataFrame):
@@ -43,7 +47,7 @@ predictors = {
 inputs = {
     'Linear': {'state_name': ['Georgia'], 'gender': ['Male'], 'tobacco': ['Smokeless Tobacco']},
     'MultiLinear': {'state_name': ['Alaska'], 'tobacco': ['Pipe']},
-    'Logistic': {'state_name': ['Alabama', 'Georgia'], 'gender': ['Female', 'Male'], 'age': [33, 55]},
+    'Logistic': {'state_name': ['Alabama', 'Georgia'], 'gender': ['Female', 'Male'], 'age': [46, 55]},
     'DecisionTree': {'state_name': ['Georgia', 'Alabama'], 'gender': ['Female', 'Male'], 'age': [21, 55]}
 }
 
@@ -58,10 +62,10 @@ def from_saved_model(path: str):
 
 
 def test_saved_model():
-    file_name = "decision_tree_model"
+    file_name = "logistic_model"
     path = f"models/{file_name}"
     predict = from_saved_model(path)
-    res = predict(pd.DataFrame(inputs['DecisionTree']))
+    res = predict(pd.DataFrame(inputs['Logistic']))
     print(res)
 
 
